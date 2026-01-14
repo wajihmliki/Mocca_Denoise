@@ -62,8 +62,11 @@ class DenoiseRouter:
         self.cnn_enabled = cnn_enabled
 
         # CNN scaffold (identity forward for now)
-        self.cnn = CNNDenoiser(device=device)
-
+        #self.cnn = CNNDenoiser(device=device)
+        #self.cnn = CNNDenoiser(model_path="models/cnn_medium.pt")
+        self.cnn = None
+        if self.cnn_enabled:
+            self.cnn = CNNDenoiser(model_path="models/cnn_medium.pt", device=device)
 
     # -----------------------------
     # Internal helpers
@@ -79,8 +82,18 @@ class DenoiseRouter:
 
 
     def _run_cnn(self, y: np.ndarray) -> Tuple[np.ndarray, Dict]:
-        y_out, meta = self.cnn.denoise(y, return_metadata=True)
+        y_out = self.cnn.denoise(y)
+        if self.cnn is None:
+            raise RuntimeError("CNN requested but cnn_enabled=False or model not initialized")
+
+        meta = {
+            "method": "cnn",
+            "model_path": getattr(self.cnn, "model_path", None),
+            "device": getattr(self.cnn, "device", None),
+            "ready": getattr(self.cnn, "ready", False),
+        }
         return y_out, meta
+
 
 
     def _run_qc(
@@ -154,6 +167,11 @@ class DenoiseRouter:
             y_dn, dn_meta = self._run_cnn(y_raw)
         else:
             y_dn, dn_meta = self._run_classical(y_raw)
+
+        if method == "cnn" and not dn_meta.get("ready", False):
+            meta["router"]["note"] = "cnn selected but model not ready; falling back to classical"
+            y_dn, dn_meta = self._run_classical(y_raw)
+            method = "classical"
 
         meta["denoiser"] = dn_meta
         meta["selected_method"] = method

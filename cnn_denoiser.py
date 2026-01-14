@@ -1,136 +1,64 @@
-"""
-cnn_denoiser.py
-
-CNN denoiser scaffold for MOCCA.
-Currently implements an identity forward pass (NO signal modification).
-
-This file defines the final interface and data flow.
-Training / real inference will be enabled later.
-"""
-
-from typing import Optional, Dict
+import os
 import numpy as np
-
-try:
-    import torch
-    import torch.nn as nn
-except ImportError:
-    torch = None
-    nn = None
+import torch
+import torch.nn as nn
 
 
-class CNNDenoiser(nn.Module):
-    """
-    CNN-based denoiser scaffold.
-
-    IMPORTANT:
-    - Forward pass is identity
-    - No learnable behavior is active
-    - Safe to integrate into pipeline
-    """
-
-    def __init__(
-        self,
-        normalize: bool = True,
-        device: str = "cpu"
-    ):
+class Small1DCNN(nn.Module):
+    def __init__(self, channels=32, k=9):
         super().__init__()
+        pad = k // 2
+        self.net = nn.Sequential(
+            nn.Conv1d(1, channels, k, padding=pad),
+            nn.ReLU(),
+            nn.Conv1d(channels, channels, k, padding=pad),
+            nn.ReLU(),
+            nn.Conv1d(channels, 1, k, padding=pad),
+        )
 
-        self.normalize = normalize
-        self.device = device
-
-        # ---- placeholder layers (NOT USED YET) ----
-        # These exist to lock architecture and interfaces
-        if nn is not None:
-            self.placeholder = nn.Identity()
-        else:
-            self.placeholder = None
-
-        self.eval()  # force eval mode
+    def forward(self, x):
+        return self.net(x)
 
 
-    def _normalize(self, y: np.ndarray):
+class CNNDenoiser:
+    """
+    CPU-safe 1D CNN denoiser with per-sample normalization.
+    Loads a trained model checkpoint (state_dict) if present.
+    """
+
+    def __init__(self, model_path="models/cnn_medium.pt", device=None):
+        self.model_path = model_path
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.model = Small1DCNN().to(self.device)
+        self.model.eval()
+
+        self.ready = False
+        if os.path.exists(self.model_path):
+            state = torch.load(self.model_path, map_location=self.device)
+            self.model.load_state_dict(state)
+            self.ready = True
+
+    def denoise(self, y_raw: np.ndarray) -> np.ndarray:
         """
-        Normalize signal to zero mean / unit std.
-        Returns normalized signal + stats for inversion.
+        Returns denoised signal with the same length as input.
+        If model isn't ready, returns input unchanged.
         """
-        mean = float(np.mean(y))
-        std = float(np.std(y))
-        if std == 0:
-            std = 1.0
-        return (y - mean) / std, mean, std
+        y_raw = np.asarray(y_raw, dtype=np.float32)
 
+        if not self.ready:
+            return y_raw.copy()
 
-    def _denormalize(self, y: np.ndarray, mean: float, std: float):
-        return y * std + mean
+        m = float(np.mean(y_raw))
+        s = float(np.std(y_raw))
+        if s <= 1e-12:
+            return y_raw.copy()
 
+        x = (y_raw - m) / s
+        x_t = torch.from_numpy(x[None, None, :]).to(self.device)  # (1,1,L)
 
-    def forward(self, y: torch.Tensor) -> torch.Tensor:
-        """
-        Identity forward pass.
-        """
-        return y
+        with torch.no_grad():
+            y_hat = self.model(x_t).cpu().numpy()[0, 0, :]
 
-
-    def denoise(
-        self,
-        y: np.ndarray,
-        return_metadata: bool = False
-    ):
-        """
-        Public API used by the pipeline.
-
-        Parameters
-        ----------
-        y : np.ndarray
-            1D chromatogram intensity array
-        return_metadata : bool
-            If True, returns metadata dict
-
-        Returns
-        -------
-        y_out : np.ndarray
-            Denoised signal (currently identical to input)
-        meta : dict (optional)
-            Metadata for audit trail
-        """
-
-        if y.ndim != 1:
-            raise ValueError("CNNDenoiser expects 1D signal")
-
-        meta: Dict[str, Optional[str]] = {
-            "method": "cnn",
-            "status": "identity_forward",
-            "normalized": False,
-            "note": "CNN scaffold active, no learning applied"
-        }
-
-        y_proc = y.astype(np.float32, copy=True)
-
-        # ---- optional normalization (NO EFFECT since identity) ----
-        if self.normalize:
-            y_proc, mean, std = self._normalize(y_proc)
-            meta["normalized"] = True
-        else:
-            mean, std = 0.0, 1.0
-
-        # ---- torch pass (identity) ----
-        if torch is not None:
-            yt = torch.from_numpy(y_proc).to(self.device)
-            with torch.no_grad():
-                yt_out = self.forward(yt)
-            y_out = yt_out.cpu().numpy()
-        else:
-            y_out = y_proc
-
-        # ---- de-normalize ----
-        if self.normalize:
-            y_out = self._denormalize(y_out, mean, std)
-
-        # Guarantee exact shape & type
-        y_out = y_out.astype(np.float64)
-
-        if return_metadata:
-            return y_out, meta
-        else:
-            return y_out
+        y_dn = y_hat * s + m
+        return y_dn.astype(np.float32)
