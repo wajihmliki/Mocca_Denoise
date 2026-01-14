@@ -32,3 +32,8 @@ Runs end-to-end evaluations of the full denoising router (classical vs CNN) and 
 
 11. run_evaluation.py
 Executes standalone evaluation of classical denoising methods over multiple samples and summarizes the results.
+
+12. compare_methods
+Compare the CNN and the classical denoising
+
+Input folder has all the input files from ADE, output has the files that will go to MOCCA
