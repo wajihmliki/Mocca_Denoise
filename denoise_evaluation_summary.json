@@ -1,0 +1,23 @@
+{
+  "gentle": {
+    "num_files": 2,
+    "area_error_mean": 1.0227598583461784e-06,
+    "area_error_p95": 3.0276112592742658e-06,
+    "area_error_max": 3.4982650813920453e-06,
+    "noise_ratio_mean": 1.0000512921068032
+  },
+  "medium": {
+    "num_files": 2,
+    "area_error_mean": 5.305716058903928e-06,
+    "area_error_p95": 1.5536335722441226e-05,
+    "area_error_max": 1.7894226211043673e-05,
+    "noise_ratio_mean": 1.0002905026098534
+  },
+  "strong": {
+    "num_files": 2,
+    "area_error_mean": 2.2578057147652343e-05,
+    "area_error_p95": 6.983246318970249e-05,
+    "area_error_max": 8.057028469465553e-05,
+    "noise_ratio_mean": 1.0007801576356559
+  }
+}

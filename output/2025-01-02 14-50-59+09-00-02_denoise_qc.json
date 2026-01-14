@@ -1,0 +1,21 @@
+{
+  "sample": "2025-01-02 14-50-59+09-00-02",
+  "preset": "medium",
+  "qc_pass": true,
+  "qc_results": [
+    {
+      "begin_time": 35.092083,
+      "end_time": 38.84875,
+      "area_raw": 9.793170808408004,
+      "area_denoised": 9.793159983641168,
+      "relative_error": 1.105338306413306e-06
+    },
+    {
+      "begin_time": 18.572083,
+      "end_time": 19.46875,
+      "area_raw": 345.06329125622796,
+      "area_denoised": 345.0632745746845,
+      "relative_error": 4.834343113133705e-08
+    }
+  ]
+}
