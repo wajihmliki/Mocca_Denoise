@@ -36,4 +36,4 @@ Executes standalone evaluation of classical denoising methods over multiple samp
 14. compare_methods
 Compare the CNN and the classical denoising
 
-Input folder has all the input files from ADE, output has the files that will go to MOCCA
+Input folder has sample input files from ADE, output has sample files that will go to MOCCA
